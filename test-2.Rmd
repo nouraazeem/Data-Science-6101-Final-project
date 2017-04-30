@@ -1,11 +1,10 @@
 ---
-title: "test"
-author: "Brendan Cox"
+title: "Project 2: DATS 6101"
+author: "Noura Azeem, Brendan Cox, Anna Heffernan"
 date: "March 20, 2017"
 output: html_document
 ---
-##Project 2: DATS 6101
-###Noura Azeem, Brendan Cox, Anna Heffernan
+
 
 ```{r}
 library(leaps)
