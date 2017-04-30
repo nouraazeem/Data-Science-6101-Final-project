@@ -1,0 +1,121 @@
+---
+title: "test"
+author: "Brendan Cox"
+date: "March 20, 2017"
+output: html_document
+---
+##Project 2: DATS 6101
+###Noura Azeem, Brendan Cox, Anna Heffernan
+
+```{r}
+library(leaps)
+library(corrplot)
+
+gymdata <- data.frame(read.csv("data.csv", header=TRUE)) 
+
+str(gymdata)
+head(gymdata) #examine the data
+
+gymdata$date <- NULL #set the date column to null for EDA/regression analysis
+
+corGym <- cor(gymdata) #check correlations
+corrplot(corGym, method = "circle") #plot the correlation matrix
+
+#Convert variables to factors to better represent the data
+gymdata$is_weekend <- as.factor(gymdata$is_weekend)
+gymdata$is_holiday <- as.factor(gymdata$is_holiday)
+gymdata$is_start_of_semester <- as.factor(gymdata$is_start_of_semester)
+gymdata$is_during_semester <- as.factor(gymdata$is_during_semester)
+
+bins <- cut(gymdata$hour, breaks = 4, by = 6, labels = c("Early Morning", "Morning", "Afternoon", "Night")) #Breaking down times into bins, where midnight-6am is early morning, 6am-noon is morning, noon - 6pm is afternoon, and 6pm-midnight is night.
+head(bins)
+summary(bins)
+```
+
+Graphs for Presentation
+```{r}
+plot(y =gymdata$number_people, x= gymdata$hour) #plot of people vs hour
+plot(gymdata$number_people ~ gymdata$temperature) #plot of people vs temperature
+plot(gymdata$number_people ~ gymdata$is_during_semester) #plot of people vs during the semester
+
+reg <- regsubsets(number_people~., data = gymdata, method="exhaustive") #subsetting to find the best regression model
+
+summary(reg) #summarizes this method
+
+plot(reg, scale ="r2") #plots the r^2 values for the regression subsetting
+title(main = "Stepwise Regression Results and R2 Value", col.main="blue")
+plot(reg, scale ="bic") #plots the bic values for the regression subsetting, everything is significant
+title(main = "Stepwise Regression Results and BIC values", col.main="green")
+plot(reg, scale ="adjr2") #plots the r^2 values for the regression subsetting
+title(main = "Stepwise Regression Results and Adj. R2 values", col.main="red")
+
+```
+
+```{r}
+#Plots
+gymdata$day_of_week <- as.factor(gymdata$day_of_week) #Converting day of week and month to factors to better visualize trends
+gymdata$month <- as.factor(gymdata$month)
+#gymdata$hour <- as.factor(gymdata$hour)
+plot(y =gymdata$number_people, x= gymdata$day_of_week) #plot of people vs day of week
+plot(y =gymdata$number_people, x= gymdata$month) #plot of people vs month
+
+bins <- cut(gymdata$hour, breaks = 4, by = 6, labels = c("Early Morning", "Morning", "Afternoon", "Night")) #Breaking down times into bins, where midnight-6am is early morning, 6am-noon is morning, noon - 6pm is afternoon, and 6pm-midnight is night.
+plot(y =gymdata$number_people, x= bins) #plot of people vs bins of hours
+plot(y =gymdata$number_people, x= gymdata$is_holiday) #more people go to the gym not on a holiday, which makes sense 
+plot(y =gymdata$number_people, x= gymdata$is_start_of_semester) #slightly more go to the gym at the beginning of the semster
+
+##GG Plots for Graphics of Presentation
+library(ggplot2)
+ggplot(gymdata, aes(x=gymdata$day_of_week, y=gymdata$number_people, fill=gymdata$day_of_week)) + geom_boxplot() + scale_x_discrete(name = "Day of Week", labels = c("0" = "Monday", "1" = "Tuesday", "2" = "Wednesday", "3" = "Thursday", "4" = "Friday", "5" = "Saturday", "6" = "Sunday")) + scale_y_continuous(name="Number of People") + ggtitle("Gym Attendance by Day of the Week") #0 is Monday, 6 is sunday
+
+ggplot(gymdata, aes(x=gymdata$month, y=gymdata$number_people, fill=gymdata$month)) + geom_boxplot() + scale_x_discrete(name="Month") + scale_y_continuous(name="Number of People") + ggtitle("Gym Attendance by Month")
+
+#GGplot for bins
+ggplot(gymdata, aes(x=bins, y=gymdata$number_people, fill=bins)) + geom_boxplot() + scale_x_discrete(name="Time of Day") + scale_y_continuous(name="Number of People") + ggtitle("Gym Attendance by Parts of the Day")
+
+
+```
+
+
+Determining a Regression Model from the most signigicant variables:
+```{r}
+library(fmsb)
+gymdata$day_of_week <- as.integer(gymdata$day_of_week) #Converting day of week and month back to integer for regression
+gymdata$month <- as.integer(gymdata$month)
+
+gymRegression <- lm(number_people~day_of_week+ is_weekend+ is_holiday+temperature+is_start_of_semester+is_during_semester+month+hour, data=gymdata) #inital model uses the model that explains the most variance, all variables contribute to the model
+
+summary(gymRegression) #summarizes the previous model
+#anova(gymRegression) #examine which variables contribute the most towards variance
+VIF(gymRegression) #our variables are moderately coorelated but not highly correlated. This is something we could examine more in the future.
+```
+
+Prediction Estimates
+```{r}
+library(stats)
+#Predict how many people there on a Friday, at 6 pm, not at the beginning of the semester, not on a holiday, when it is 72 degrees, in April
+newdata <- data.frame(day_of_week = 4,
+                         hour=18,
+                         month=4,
+                         is_start_of_semester="0",
+                         is_holiday="0",
+                         is_during_semester="1", 
+                         temperature=72,
+                         is_weekend="0")
+predict(gymRegression, newdata, interval = "predict")
+#we predict 58 people would be at the gym
+
+
+#Test our Original Prediction that Most populated gym times would be evenings say 6 pm, Sundays, beginnings of semesters, but not on holidays. We'll say Month = 1 for beginning of Spring Semester in January. Temperature = 50 is average for UC Berkely (based on US Climate Data)
+ourpred <- data.frame(day_of_week = 6,
+                         hour=18,
+                         month=1,
+                         is_start_of_semester="1",
+                         is_holiday="0",
+                         is_during_semester="1", 
+                         temperature=50,
+                         is_weekend="1")
+predict(gymRegression, ourpred, interval = "predict")
+#We would have predicted that there would be more people at this time than at the previous prediction we made, which means we have to further analysis to see which variable(s) are contributing more to people's attendance at the gym
+```
+
